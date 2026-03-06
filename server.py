@@ -24,22 +24,31 @@ except ImportError:
 # ── CONFIGURE YOUR COLLEGE EMAIL DOMAIN HERE ───────────────
 ALLOWED_DOMAIN = 'cgu-odisha.ac.in'
 
-# Initialize Firebase Admin SDK using service account JSON.
-# Set the FIREBASE_SERVICE_ACCOUNT environment variable to the path of your
-# downloaded service account JSON file from Firebase Console →
-# Project Settings → Service Accounts → Generate new private key.
+# Initialize Firebase Admin SDK.
+# • Local dev  → set FIREBASE_SERVICE_ACCOUNT to the path of your service account JSON file.
+# • Vercel/cloud → set FIREBASE_SERVICE_ACCOUNT_JSON to the entire JSON content as a string.
 _firebase_initialized = False
 if _FIREBASE_AVAILABLE:
     try:
-        sa_path = os.environ.get('FIREBASE_SERVICE_ACCOUNT')
-        if sa_path:
+        import json as _json
+        sa_json_str = os.environ.get('FIREBASE_SERVICE_ACCOUNT_JSON')
+        sa_path     = os.environ.get('FIREBASE_SERVICE_ACCOUNT')
+
+        if sa_json_str:
+            # Cloud: JSON content stored directly as an env var string
+            cred = credentials.Certificate(_json.loads(sa_json_str))
+            firebase_admin.initialize_app(cred)
+            _firebase_initialized = True
+            print(f'[AUTH] Firebase Admin initialized via JSON string. Domain: @{ALLOWED_DOMAIN}')
+        elif sa_path:
+            # Local: path to the service account JSON file
             cred = credentials.Certificate(sa_path)
             firebase_admin.initialize_app(cred)
             _firebase_initialized = True
-            print(f'[AUTH] Firebase Admin initialized. Domain restricted to @{ALLOWED_DOMAIN}')
+            print(f'[AUTH] Firebase Admin initialized via file path. Domain: @{ALLOWED_DOMAIN}')
         else:
-            print('[AUTH] WARNING: FIREBASE_SERVICE_ACCOUNT env var not set.')
-            print('[AUTH] Token verification is DISABLED — set this var before going to production.')
+            print('[AUTH] WARNING: Neither FIREBASE_SERVICE_ACCOUNT_JSON nor FIREBASE_SERVICE_ACCOUNT is set.')
+            print('[AUTH] Token verification is DISABLED — set one before going to production.')
     except Exception as e:
         print(f'[AUTH] Firebase Admin init failed: {e}')
 
@@ -64,12 +73,16 @@ def serve_static(filename):
 
 # Database connection
 def get_db():
-    conn = psycopg2.connect(
-        host=os.environ.get('DB_HOST', 'localhost'),
-        database=os.environ.get('DB_NAME', 'lostaf'),
-        user=os.environ.get('DB_USER', 'postgres'),
-        password=os.environ.get('DB_PASS')
-    )
+    database_url = os.environ.get('DATABASE_URL')
+    if database_url:
+        conn = psycopg2.connect(database_url, sslmode='require')
+    else:
+        conn = psycopg2.connect(
+            host=os.environ.get('DB_HOST', 'localhost'),
+            database=os.environ.get('DB_NAME', 'lostaf'),
+            user=os.environ.get('DB_USER', 'postgres'),
+            password=os.environ.get('DB_PASS')
+        )
     conn.set_client_encoding('UTF8')
     return conn
 
