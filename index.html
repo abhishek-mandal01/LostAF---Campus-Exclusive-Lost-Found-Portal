@@ -34,12 +34,7 @@
     <!-- =================== NAVBAR =================== -->
     <nav class="navbar" id="navbar">
         <div class="nav-logo" onclick="navigate('landing')">Lost<span style="color:var(--accent-orange)">AF</span></div>
-        <a href="https://cgu-odisha.ac.in/" target="_blank" style="display:flex;align-items:center;margin-right:auto;margin-left:16px;"><img src="cgu_logo.png" alt="CGU Logo" style="height:55px; width: 55px; margin-left: 20px;"></a>
-
-        <div class="nav-search" id="navSearchWrap" style="display:none;">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.4)" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-            <input type="text" id="smartSearch" placeholder="AI Smart Search... try 'blue bottle'" oninput="handleSmartSearch(this.value)">
-        </div>
+        <a href="https://cgu-odisha.ac.in/" target="_blank" class="nav-cgu-link" style="display:flex;align-items:center;margin-right:auto;margin-left:16px;"><img src="cgu_logo.png" alt="CGU Logo" class="nav-cgu-logo" style="height:55px; width: 55px; margin-left: 20px;"></a>
 
         <ul class="nav-links" id="navLinks">
             <li><a onclick="navigate('landing')" class="active" data-page="landing">Home</a></li>
@@ -119,6 +114,10 @@
 
     <!-- =================== FEED / DASHBOARD PAGE =================== -->
     <section class="page" id="page-feed">
+        <div class="feed-search-bar" id="navSearchWrap">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.4)" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <input type="text" id="smartSearch" placeholder="AI Smart Search... try 'blue bottle'" oninput="handleSmartSearch(this.value)">
+        </div>
         <div class="dashboard-layout">
             <!-- Sidebar -->
             <aside class="sidebar glass">

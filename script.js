@@ -138,8 +138,10 @@ function navigate(page, typePreset) {
         if (a.dataset.page === page) a.classList.add('active');
     });
 
-    // Show/hide nav search
-    document.getElementById('navSearchWrap').style.display = page === 'feed' ? 'flex' : 'none';
+    // Clear search when leaving feed
+    if (page !== 'feed') {
+        document.getElementById('smartSearch').value = '';
+    }
 
     if (page === 'feed') {
         renderFeed();

@@ -205,24 +205,25 @@ body {
     border-radius: 2px;
 }
 
-.nav-search {
+.feed-search-bar {
     display: flex;
     align-items: center;
-    background: var(--glass-bg);
-    border: 1px solid var(--glass-border);
+    background: rgba(255, 255, 255, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.3);
     border-radius: 10px;
-    padding: 0 14px;
-    height: 40px;
-    width: 280px;
+    padding: 0 16px;
+    height: 44px;
+    max-width: 600px;
+    margin: 0 auto 20px;
     transition: var(--transition);
 }
 
-.nav-search:focus-within {
+.feed-search-bar:focus-within {
     border-color: var(--accent-blue);
     box-shadow: 0 0 20px var(--accent-blue-glow);
 }
 
-.nav-search input {
+.feed-search-bar input {
     background: transparent;
     border: none;
     outline: none;
@@ -233,7 +234,7 @@ body {
     font-family: 'Inter', sans-serif;
 }
 
-.nav-search input::placeholder {
+.feed-search-bar input::placeholder {
     color: var(--text-muted);
 }
 
@@ -1573,26 +1574,33 @@ body {
 
 @media (max-width: 768px) {
     .navbar {
-        padding: 0 20px;
+        padding: 0 12px;
+        gap: 8px;
     }
 
-    .nav-search {
-        display: none;
+    .nav-logo {
+        font-size: 1.4rem;
     }
+
+
 
     .nav-links {
         display: none;
         position: fixed;
         top: 72px;
-        left: 0;
         right: 0;
-        bottom: 0;
-        background: rgba(10, 10, 20, 0.95);
-        backdrop-filter: blur(20px);
-        -webkit-backdrop-filter: blur(20px);
-        flex-direction: column;
-        padding: 20px;
+        width: 55%;
+        max-width: 280px;
+        background: rgba(8, 8, 18, 0.97);
+        backdrop-filter: blur(24px);
+        -webkit-backdrop-filter: blur(24px);
+        border-left: 1px solid var(--glass-border);
         border-bottom: 1px solid var(--glass-border);
+        border-radius: 0 0 0 var(--border-radius);
+        box-shadow: var(--shadow-lg);
+        flex-direction: column;
+        gap: 6px;
+        padding: 16px;
         z-index: 999;
     }
 
@@ -1602,6 +1610,47 @@ body {
 
     .hamburger {
         display: flex;
+    }
+
+    .nav-auth {
+        margin-left: 4px;
+        gap: 6px;
+    }
+
+    .nav-login-btn {
+        padding: 6px 10px;
+        font-size: 0.72rem;
+        gap: 4px;
+    }
+
+    .nav-login-btn svg {
+        width: 14px;
+        height: 14px;
+    }
+
+    .nav-username {
+        display: none;
+    }
+
+    .nav-avatar {
+        width: 26px;
+        height: 26px;
+        font-size: 0.7rem;
+    }
+
+    .nav-signout {
+        font-size: 0.7rem;
+        padding: 4px 6px;
+    }
+
+    .nav-cgu-link {
+        margin-left: 8px !important;
+    }
+
+    .nav-cgu-logo {
+        height: 38px !important;
+        width: 38px !important;
+        margin-left: 0 !important;
     }
 
     .dashboard-layout {
@@ -1654,48 +1703,6 @@ body {
         padding: 90px 12px 24px;
     }
 
-    .about-hero {
-        padding: 60px 16px 30px;
-    }
-
-    .about-section {
-        padding: 0 12px 24px;
-    }
-
-    .profile-card {
-        grid-template-columns: 1fr;
-        padding: 24px;
-        text-align: center;
-    }
-
-    .profile-img-container {
-        justify-self: center;
-    }
-
-    .dev-name {
-        justify-content: center;
-        font-size: 1.4rem;
-    }
-
-    .social-links-about {
-        justify-content: center;
-    }
-
-    .profile-content {
-        align-items: center;
-    }
-
-    .bio-text {
-        text-align: left;
-    }
-
-    .skill-bars {
-        width: 100%;
-    }
-
-    .tech-stack {
-        justify-content: center;
-    }
 }
 
 @media (max-width: 480px) {
@@ -1865,7 +1872,7 @@ body {
     grid-template-columns: 280px 1fr;
     gap: 40px;
     padding: 40px;
-    overflow: hidden;
+    overflow: visible;
 }
 
 .profile-img-container {
@@ -2137,6 +2144,75 @@ body {
     display: inline-flex;
     align-items: center;
     gap: 5px;
+}
+
+/* About Page Responsive */
+@media (max-width: 768px) {
+    .about-hero {
+        padding: 60px 16px 30px;
+    }
+
+    .about-section {
+        padding: 0 12px 24px;
+        max-width: 100%;
+        overflow: hidden;
+    }
+
+    .profile-card {
+        grid-template-columns: 1fr;
+        padding: 24px;
+        text-align: center;
+        overflow: hidden;
+        gap: 24px;
+    }
+
+    .profile-img-container {
+        justify-self: center;
+    }
+
+    .profile-content {
+        align-items: center;
+        min-width: 0;
+        word-wrap: break-word;
+        overflow-wrap: break-word;
+    }
+
+    .dev-name {
+        justify-content: center;
+        font-size: 1.4rem;
+    }
+
+    .social-links-about {
+        justify-content: center;
+    }
+
+    .bio-text {
+        text-align: left;
+    }
+
+    .skill-bars {
+        width: 100%;
+    }
+
+    .tech-stack {
+        justify-content: center;
+    }
+}
+
+@media (max-width: 480px) {
+    .social-links-about {
+        flex-direction: column;
+        width: 100%;
+    }
+
+    .social-btn-about {
+        justify-content: center;
+    }
+
+    .profile-pic-wrapper {
+        width: 160px;
+        height: 160px;
+    }
 }
 
 
