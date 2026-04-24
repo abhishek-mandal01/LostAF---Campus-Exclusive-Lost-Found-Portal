@@ -43,7 +43,12 @@ LostAF/
 ├── server.py           # Flask REST API backend
 ├── schema.sql          # PostgreSQL schema + migration notes
 ├── requirements.txt    # Python dependencies
-├── favicon.svg         # Brand favicon
+├── resources/          # Static media assets (images, video, icons)
+│   ├── favicon.svg
+│   ├── cgu_logo.png
+│   ├── cgu_poster.jpg
+│   ├── cgu_vid.mp4
+│   └── abhishek.webp
 ├── .gitignore
 └── .env                # Local secrets (not committed)
 ```
