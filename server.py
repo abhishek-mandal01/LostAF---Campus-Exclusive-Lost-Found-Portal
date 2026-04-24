@@ -87,6 +87,32 @@ def get_db():
     return conn
 
 
+# ──── DB MIGRATIONS ────
+
+def ensure_item_images_table():
+    """Create the item_images table if it doesn't exist (Step 3 migration)."""
+    try:
+        conn = get_db()
+        cur = conn.cursor()
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS item_images (
+                id            SERIAL PRIMARY KEY,
+                item_id       INT NOT NULL REFERENCES items(id) ON DELETE CASCADE,
+                image_data    TEXT NOT NULL,
+                display_order INT DEFAULT 0,
+                created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_item_images_item ON item_images(item_id)")
+        conn.commit()
+        cur.close()
+        conn.close()
+    except Exception as e:
+        print(f"[DB Migration] item_images: {e}")
+
+ensure_item_images_table()
+
+
 # ──── AUTH MIDDLEWARE ────
 
 def verify_firebase_token(token):
@@ -117,6 +143,24 @@ def require_auth(f):
             return jsonify({'error': 'Invalid or expired token. Please sign in again.'}), 401
         return f(*args, **kwargs)
     return decorated
+
+
+# ──── RANK SYSTEM ────
+
+RANK_TIERS = [
+    (10, 'Legend',         '👑'),
+    (6,  'Campus Hero',    '🦸'),
+    (3,  'Good Samaritan', '⭐'),
+    (1,  'Helper',         '🤝'),
+    (0,  'Newcomer',       '🌱'),
+]
+
+def get_rank_title(items_returned):
+    """Return (rank_title, badge_emoji) for a given items_returned count."""
+    for threshold, title, badge in RANK_TIERS:
+        if items_returned >= threshold:
+            return title, badge
+    return 'Newcomer', '🌱'
 
 
 # ──── ITEMS ENDPOINTS ────
@@ -203,6 +247,25 @@ def create_item():
     ))
 
     item_id = cur.fetchone()[0]
+
+    # ── Store multiple images in item_images table ──
+    images = data.get('images', [])
+    if images:
+        for idx, img_data in enumerate(images[:4]):  # max 4 images
+            cur.execute("""
+                INSERT INTO item_images (item_id, image_data, display_order)
+                VALUES (%s, %s, %s)
+            """, (item_id, img_data, idx))
+        # Also set the first image as the thumbnail
+        if not data.get('image_url'):
+            cur.execute("UPDATE items SET image_url = %s WHERE id = %s", (images[0], item_id))
+    elif data.get('image_url'):
+        # Legacy single-image: also store in item_images for consistency
+        cur.execute("""
+            INSERT INTO item_images (item_id, image_data, display_order)
+            VALUES (%s, %s, 0)
+        """, (item_id, data['image_url']))
+
     conn.commit()
     cur.close()
     conn.close()
@@ -213,19 +276,80 @@ def create_item():
 @app.route('/api/items/<int:item_id>/reunite', methods=['PUT'])
 @require_auth
 def reunite_item(item_id):
-    """Mark an item as reunited — requires authentication"""
+    """Mark an item as reunited — requires authentication AND ownership."""
     conn = get_db()
     cur = conn.cursor()
 
+    # ── 1. Fetch item + owner in one query ──
+    cur.execute("""
+        SELECT i.status, u.email AS owner_email
+        FROM items i
+        JOIN users u ON i.user_id = u.id
+        WHERE i.id = %s
+    """, (item_id,))
+    row = cur.fetchone()
+
+    if not row:
+        cur.close(); conn.close()
+        return jsonify({'error': 'Item not found.'}), 404
+
+    status, owner_email = row
+
+    # ── 2. Already reunited? ──
+    if status == 'reunited':
+        cur.close(); conn.close()
+        return jsonify({'error': 'This item has already been reunited.'}), 400
+
+    # ── 3. Ownership check ──
+    firebase_user = getattr(request, 'firebase_user', None)
+    requester_email = firebase_user.get('email') if firebase_user else None
+
+    if requester_email and requester_email != owner_email:
+        cur.close(); conn.close()
+        return jsonify({'error': 'Only the item owner can mark it as reunited.'}), 403
+
+    # ── 4. All checks passed — mark reunited ──
     cur.execute("""
         UPDATE items SET status = 'reunited', updated_at = %s WHERE id = %s
     """, (datetime.now(), item_id))
+
+    # ── 5. Increment owner's items_returned + update rank ──
+    cur.execute("""
+        UPDATE users SET items_returned = items_returned + 1,
+                         updated_at     = CURRENT_TIMESTAMP
+        WHERE id = (SELECT user_id FROM items WHERE id = %s)
+        RETURNING items_returned
+    """, (item_id,))
+    new_count = cur.fetchone()[0]
+    new_rank, _ = get_rank_title(new_count)
+    cur.execute("""
+        UPDATE users SET rank_title = %s
+        WHERE id = (SELECT user_id FROM items WHERE id = %s)
+    """, (new_rank, item_id))
 
     conn.commit()
     cur.close()
     conn.close()
 
-    return jsonify({'message': 'Item marked as reunited!'})
+    return jsonify({'message': 'Item marked as reunited!', 'new_rank': new_rank})
+
+# ──── ITEM IMAGES ────
+
+@app.route('/api/items/<int:item_id>/images', methods=['GET'])
+def get_item_images(item_id):
+    """Get all images for an item."""
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("""
+        SELECT image_data, display_order
+        FROM item_images
+        WHERE item_id = %s
+        ORDER BY display_order ASC
+    """, (item_id,))
+    images = [{'image_data': row[0], 'display_order': row[1]} for row in cur.fetchall()]
+    cur.close()
+    conn.close()
+    return jsonify(images)
 
 
 # ──── USERS ENDPOINTS ────
@@ -339,6 +463,35 @@ def get_stats():
         'reunited': reunited,
         'users': users
     })
+
+
+# ──── LEADERBOARD ────
+
+@app.route('/api/leaderboard', methods=['GET'])
+def get_leaderboard():
+    """Get top users ranked by items returned."""
+    conn = get_db()
+    cur = conn.cursor()
+
+    cur.execute("""
+        SELECT name, avatar_emoji, items_returned, rank_title, profile_picture
+        FROM users
+        WHERE items_returned > 0
+        ORDER BY items_returned DESC, updated_at ASC
+        LIMIT 20
+    """)
+
+    columns = [desc[0] for desc in cur.description]
+    leaders = []
+    for row in cur.fetchall():
+        user = dict(zip(columns, row))
+        _, badge = get_rank_title(user['items_returned'])
+        user['badge'] = badge
+        leaders.append(user)
+
+    cur.close()
+    conn.close()
+    return jsonify(leaders)
 
 
 if __name__ == '__main__':

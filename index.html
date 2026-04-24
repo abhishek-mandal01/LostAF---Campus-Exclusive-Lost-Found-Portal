@@ -40,6 +40,7 @@
             <li><a onclick="navigate('landing')" class="active" data-page="landing">Home</a></li>
             <li><a onclick="navigate('feed')" data-page="feed">Dashboard</a></li>
             <li><a onclick="navigate('report')" data-page="report">Report Item</a></li>
+            <li><a onclick="navigate('leaderboard')" data-page="leaderboard">Leaderboard</a></li>
             <li><a onclick="navigate('about')" data-page="about">About</a></li>
         </ul>
 
@@ -420,15 +421,22 @@
                 </div>
 
                 <div class="form-group">
-                    <label>Upload Image (Optional)</label>
+                    <label>Upload Images (Optional — Max 4)</label>
                     <div class="upload-zone" id="uploadZone">
-                        <input type="file" id="imageUpload" accept="image/*" onchange="handleImageUpload(event)">
+                        <input type="file" id="imageUpload" accept="image/*" multiple onchange="handleImageUpload(event)">
                         <span class="upload-icon">📸</span>
-                        <div class="upload-text">Drag & drop an image or click to browse</div>
-                        <div class="upload-hint">JPG, PNG, WEBP — Max 5MB</div>
-                        <div class="upload-preview" id="uploadPreview">
-                            <img id="previewImg" src="" alt="Preview">
-                        </div>
+                        <div class="upload-text">Drag & drop images or click to browse</div>
+                        <div class="upload-hint">JPG, PNG, WEBP — Max 4 images, 5MB each</div>
+                    </div>
+                    <div class="upload-actions">
+                        <button type="button" class="camera-capture-btn" onclick="openCamera()">
+                            <span class="camera-icon">📷</span>
+                            <span>Take Photo</span>
+                        </button>
+                        <input type="file" id="cameraInput" accept="image/*" capture="environment" style="display:none" onchange="handleImageUpload(event)">
+                    </div>
+                    <div class="upload-preview-grid" id="uploadPreviewGrid">
+                        <!-- JS populated: thumbnail cards with remove buttons -->
                     </div>
                 </div>
 
@@ -462,6 +470,35 @@
                     <button class="btn btn-primary" onclick="navigate('feed')">View Feed</button>
                     <button class="btn btn-ghost" onclick="resetForm()">Report Another</button>
                 </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- =================== LEADERBOARD PAGE =================== -->
+    <section class="page" id="page-leaderboard">
+        <div class="leaderboard-wrapper">
+            <div class="leaderboard-hero">
+                <div class="leaderboard-badge">🏆 Campus Heroes</div>
+                <h1 class="leaderboard-title">Leaderboard</h1>
+                <p class="leaderboard-subtitle">Students who've helped reunite the most items on campus</p>
+            </div>
+
+            <!-- Top 3 Podium -->
+            <div class="podium-section" id="leaderboardPodium">
+                <!-- JS populated -->
+            </div>
+
+            <!-- Remaining ranks -->
+            <div class="leaderboard-list glass" id="leaderboardList">
+                <!-- JS populated -->
+            </div>
+
+            <!-- Empty state -->
+            <div class="leaderboard-empty" id="leaderboardEmpty" style="display:none;">
+                <span class="leaderboard-empty-icon">🌱</span>
+                <h3>No heroes yet</h3>
+                <p>Be the first to reunite a lost item and claim your spot!</p>
+                <button class="btn btn-primary" onclick="navigate('feed')">Browse Items</button>
             </div>
         </div>
     </section>
@@ -591,7 +628,12 @@
     <div class="modal-overlay" id="itemDetailModal" onclick="closeItemDetail()">
         <div class="modal modal-detail glass-strong" onclick="event.stopPropagation()">
             <button class="modal-close-btn" onclick="closeItemDetail()">&times;</button>
-            <img class="modal-detail-img" id="detailImg" src="" alt="">
+            <div class="detail-gallery" id="detailGallery">
+                <img class="modal-detail-img" id="detailImg" src="" alt="">
+                <button class="gallery-nav gallery-prev" id="galleryPrev" onclick="galleryNav(-1)">&#8249;</button>
+                <button class="gallery-nav gallery-next" id="galleryNext" onclick="galleryNav(1)">&#8250;</button>
+                <div class="gallery-dots" id="galleryDots"></div>
+            </div>
             <div class="modal-detail-body">
                 <span class="item-card-type" id="detailType"></span>
                 <h2 class="modal-detail-title" id="detailTitle"></h2>
@@ -647,6 +689,32 @@
                 Continue with Google
             </button>
             <p class="auth-modal-note">Use your college Google account. Personal Gmail accounts will be denied.</p>
+        </div>
+    </div>
+
+    <!-- Camera Capture Modal -->
+    <div class="modal-overlay" id="cameraModal">
+        <div class="modal camera-modal glass-strong" onclick="event.stopPropagation()">
+            <div class="camera-header">
+                <h3>📷 Take Photo</h3>
+                <button class="modal-close-btn" onclick="closeCamera()">&times;</button>
+            </div>
+            <div class="camera-viewfinder">
+                <video id="cameraVideo" autoplay playsinline></video>
+                <canvas id="cameraCanvas" style="display:none"></canvas>
+                <img id="cameraPreview" style="display:none" alt="Captured photo">
+            </div>
+            <div class="camera-controls">
+                <button class="camera-btn camera-switch" id="cameraSwitchBtn" onclick="switchCamera()" title="Switch Camera">🔄</button>
+                <button class="camera-btn camera-shutter" id="cameraShutterBtn" onclick="capturePhoto()">
+                    <span class="shutter-ring"></span>
+                </button>
+                <div class="camera-btn camera-placeholder"></div>
+            </div>
+            <div class="camera-actions" id="cameraActions" style="display:none">
+                <button class="btn-retake" onclick="retakePhoto()">↻ Retake</button>
+                <button class="btn-use-photo" onclick="usePhoto()">✓ Use Photo</button>
+            </div>
         </div>
     </div>
 

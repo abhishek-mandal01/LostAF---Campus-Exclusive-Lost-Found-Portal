@@ -127,6 +127,7 @@ function navigate(page, typePreset) {
     document.getElementById('page-landing').classList.remove('active');
     document.getElementById('page-feed').classList.remove('active');
     document.getElementById('page-report').classList.remove('active');
+    document.getElementById('page-leaderboard').classList.remove('active');
     document.getElementById('page-about').classList.remove('active');
 
     // Show target page
@@ -181,6 +182,11 @@ function navigate(page, typePreset) {
         animateSkillBars();
     }
 
+    // Load leaderboard data
+    if (page === 'leaderboard') {
+        renderLeaderboard();
+    }
+
     // Close mobile menu
     document.getElementById('navLinks').classList.remove('mobile-open');
 
@@ -196,6 +202,98 @@ function animateSkillBars() {
         setTimeout(function() {
             fill.style.width = targetWidth;
         }, 100);
+    });
+}
+
+
+// =================== LEADERBOARD ===================
+var RANK_BADGES = {
+    'Legend':         '\ud83d\udc51',
+    'Campus Hero':    '\ud83e\uddb8',
+    'Good Samaritan': '\u2b50',
+    'Helper':         '\ud83e\udd1d',
+    'Newcomer':       '\ud83c\udf31'
+};
+
+function fetchLeaderboard() {
+    return fetch(API_BASE + '/leaderboard')
+        .then(function(res) { return res.json(); })
+        .catch(function(err) {
+            console.error('Failed to fetch leaderboard:', err);
+            return [];
+        });
+}
+
+function renderLeaderboard() {
+    var podium = document.getElementById('leaderboardPodium');
+    var list   = document.getElementById('leaderboardList');
+    var empty  = document.getElementById('leaderboardEmpty');
+
+    podium.innerHTML = '<div style="text-align:center;color:var(--text-muted);padding:40px;">Loading...</div>';
+    list.innerHTML = '';
+
+    fetchLeaderboard().then(function(leaders) {
+        if (!leaders.length) {
+            podium.innerHTML = '';
+            list.style.display = 'none';
+            empty.style.display = 'flex';
+            return;
+        }
+
+        empty.style.display = 'none';
+        list.style.display = '';
+
+        // ── Top 3 podium ──
+        var podiumColors = ['#ffd740', '#c0c0c0', '#cd7f32'];  // gold, silver, bronze
+        var podiumLabels = ['1st', '2nd', '3rd'];
+        var top3 = leaders.slice(0, 3);
+        var podiumHTML = '';
+
+        top3.forEach(function(user, i) {
+            var badge = user.badge || RANK_BADGES[user.rank_title] || '\ud83c\udf31';
+            var pic = user.profile_picture
+                ? '<img class="podium-avatar-img" src="' + user.profile_picture + '" alt="">'
+                : '<span class="podium-avatar-emoji">' + (user.avatar_emoji || '\ud83e\uddd1\u200d\ud83c\udf93') + '</span>';
+
+            podiumHTML += '<div class="podium-card glass-strong" style="--podium-color:' + podiumColors[i] + '">' +
+                '<div class="podium-rank">' + podiumLabels[i] + '</div>' +
+                '<div class="podium-avatar">' + pic + '</div>' +
+                '<h3 class="podium-name">' + user.name + '</h3>' +
+                '<div class="podium-stats">' +
+                    '<span class="podium-count">' + user.items_returned + '</span>' +
+                    '<span class="podium-label">items reunited</span>' +
+                '</div>' +
+                '<div class="podium-rank-title">' + badge + ' ' + user.rank_title + '</div>' +
+            '</div>';
+        });
+        podium.innerHTML = podiumHTML;
+
+        // ── Remaining users ──
+        var rest = leaders.slice(3);
+        if (!rest.length) {
+            list.style.display = 'none';
+            return;
+        }
+
+        var listHTML = '';
+        rest.forEach(function(user, i) {
+            var rank = i + 4;
+            var badge = user.badge || RANK_BADGES[user.rank_title] || '\ud83c\udf31';
+            var pic = user.profile_picture
+                ? '<img class="lb-row-avatar-img" src="' + user.profile_picture + '" alt="">'
+                : '<span class="lb-row-avatar-emoji">' + (user.avatar_emoji || '\ud83e\uddd1\u200d\ud83c\udf93') + '</span>';
+
+            listHTML += '<div class="lb-row">' +
+                '<span class="lb-row-rank">#' + rank + '</span>' +
+                '<div class="lb-row-avatar">' + pic + '</div>' +
+                '<div class="lb-row-info">' +
+                    '<span class="lb-row-name">' + user.name + '</span>' +
+                    '<span class="lb-row-title">' + badge + ' ' + user.rank_title + '</span>' +
+                '</div>' +
+                '<span class="lb-row-count">' + user.items_returned + '</span>' +
+            '</div>';
+        });
+        list.innerHTML = listHTML;
     });
 }
 
@@ -266,7 +364,9 @@ function renderFeed() {
                     '<div class="item-card-avatar">' + item.avatar + '</div>' +
                     '<span class="item-card-username">' + item.user + '</span>' +
                 '</div>' +
-                '<button class="reunite-btn" onclick="event.stopPropagation();openReuniteModal(' + item.id + ')">✨ Reunite</button>' +
+                (currentUser && currentUser.email === item.email
+                    ? '<button class="reunite-btn" onclick="event.stopPropagation();openReuniteModal(' + item.id + ')">✨ Reunite</button>'
+                    : '') +
             '</div>' +
         '</div>';
     });
@@ -388,15 +488,211 @@ function updateFormStep() {
     document.getElementById('formStep' + currentStep).classList.add('active');
 }
 
+// =================== MULTI-IMAGE UPLOAD ===================
+var selectedImages = [];  // array of base64 data URLs
+var MAX_IMAGES = 4;
+
+function compressImage(file, maxWidth, quality) {
+    return new Promise(function(resolve) {
+        var reader = new FileReader();
+        reader.onload = function(e) {
+            var img = new Image();
+            img.onload = function() {
+                var canvas = document.createElement('canvas');
+                var scale = Math.min(1, maxWidth / img.width);
+                canvas.width = img.width * scale;
+                canvas.height = img.height * scale;
+                var ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                resolve(canvas.toDataURL('image/jpeg', quality));
+            };
+            img.src = e.target.result;
+        };
+        reader.readAsDataURL(file);
+    });
+}
+
 function handleImageUpload(e) {
-    var file = e.target.files[0];
-    if (!file) return;
-    var reader = new FileReader();
-    reader.onload = function(ev) {
-        document.getElementById('previewImg').src = ev.target.result;
-        document.getElementById('uploadPreview').style.display = 'block';
+    var files = Array.from(e.target.files || []);
+    if (!files.length) return;
+
+    var remaining = MAX_IMAGES - selectedImages.length;
+    if (remaining <= 0) {
+        showToast('Maximum ' + MAX_IMAGES + ' images allowed.', 'info');
+        return;
+    }
+    files = files.slice(0, remaining);
+
+    var promises = files.map(function(file) {
+        if (file.size > 5 * 1024 * 1024) {
+            showToast(file.name + ' exceeds 5MB limit.', 'info');
+            return Promise.resolve(null);
+        }
+        return compressImage(file, 800, 0.8);
+    });
+
+    Promise.all(promises).then(function(results) {
+        results.forEach(function(base64) {
+            if (base64) selectedImages.push(base64);
+        });
+        renderImagePreviews();
+    });
+
+    // Reset input so same files can be re-selected
+    e.target.value = '';
+}
+
+function renderImagePreviews() {
+    var grid = document.getElementById('uploadPreviewGrid');
+    if (!grid) return;
+
+    var html = '';
+    selectedImages.forEach(function(src, idx) {
+        html += '<div class="preview-thumb">' +
+            '<img src="' + src + '" alt="Preview ' + (idx + 1) + '">' +
+            '<button class="preview-remove" onclick="removePreviewImage(' + idx + ')" title="Remove">&times;</button>' +
+            '<span class="preview-index">' + (idx + 1) + '</span>' +
+        '</div>';
+    });
+
+    if (selectedImages.length < MAX_IMAGES) {
+        html += '<div class="preview-thumb preview-add" onclick="document.getElementById(\'imageUpload\').click()">' +
+            '<span>+</span>' +
+        '</div>';
+    }
+
+    grid.innerHTML = html;
+    grid.style.display = selectedImages.length ? 'grid' : 'none';
+}
+
+function removePreviewImage(idx) {
+    selectedImages.splice(idx, 1);
+    renderImagePreviews();
+}
+
+// =================== CAMERA CAPTURE ===================
+var cameraStream = null;
+var facingMode = 'environment';  // 'user' for front, 'environment' for rear
+
+function openCamera() {
+    if (selectedImages.length >= MAX_IMAGES) {
+        showToast('Maximum ' + MAX_IMAGES + ' images allowed.', 'info');
+        return;
+    }
+
+    // On mobile, use native camera input for better UX
+    var isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+    if (isMobile) {
+        document.getElementById('cameraInput').click();
+        return;
+    }
+
+    // Desktop: open WebRTC viewfinder
+    var modal = document.getElementById('cameraModal');
+    modal.classList.add('active');
+    document.body.style.overflow = 'hidden';
+    startCamera();
+}
+
+function startCamera() {
+    var video = document.getElementById('cameraVideo');
+    var preview = document.getElementById('cameraPreview');
+    var actions = document.getElementById('cameraActions');
+    var controls = document.querySelector('.camera-controls');
+
+    // Reset to live view
+    video.style.display = 'block';
+    preview.style.display = 'none';
+    actions.style.display = 'none';
+    controls.style.display = 'flex';
+
+    // Stop any existing stream
+    if (cameraStream) {
+        cameraStream.getTracks().forEach(function(t) { t.stop(); });
+    }
+
+    navigator.mediaDevices.getUserMedia({
+        video: { facingMode: facingMode, width: { ideal: 1280 }, height: { ideal: 720 } },
+        audio: false
+    })
+    .then(function(stream) {
+        cameraStream = stream;
+        video.srcObject = stream;
+    })
+    .catch(function(err) {
+        console.error('Camera error:', err);
+        closeCamera();
+        // Fallback to file input
+        showToast('Camera not available. Using file picker instead.', 'info');
+        document.getElementById('cameraInput').click();
+    });
+}
+
+function switchCamera() {
+    facingMode = facingMode === 'environment' ? 'user' : 'environment';
+    startCamera();
+}
+
+function capturePhoto() {
+    var video = document.getElementById('cameraVideo');
+    var canvas = document.getElementById('cameraCanvas');
+    var preview = document.getElementById('cameraPreview');
+    var actions = document.getElementById('cameraActions');
+    var controls = document.querySelector('.camera-controls');
+
+    // Draw current video frame to canvas
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    var ctx = canvas.getContext('2d');
+    ctx.drawImage(video, 0, 0);
+
+    // Show preview
+    var dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+    preview.src = dataUrl;
+    preview.style.display = 'block';
+    video.style.display = 'none';
+    controls.style.display = 'none';
+    actions.style.display = 'flex';
+
+    // Add shutter flash effect
+    var viewfinder = document.querySelector('.camera-viewfinder');
+    viewfinder.classList.add('flash');
+    setTimeout(function() { viewfinder.classList.remove('flash'); }, 200);
+}
+
+function retakePhoto() {
+    startCamera();
+}
+
+function usePhoto() {
+    var preview = document.getElementById('cameraPreview');
+    var dataUrl = preview.src;
+
+    // Compress and add to selected images
+    var img = new Image();
+    img.onload = function() {
+        var canvas = document.createElement('canvas');
+        var scale = Math.min(1, 800 / img.width);
+        canvas.width = img.width * scale;
+        canvas.height = img.height * scale;
+        var ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        var compressed = canvas.toDataURL('image/jpeg', 0.8);
+        selectedImages.push(compressed);
+        renderImagePreviews();
+        closeCamera();
+        showToast('Photo captured!', 'success');
     };
-    reader.readAsDataURL(file);
+    img.src = dataUrl;
+}
+
+function closeCamera() {
+    if (cameraStream) {
+        cameraStream.getTracks().forEach(function(t) { t.stop(); });
+        cameraStream = null;
+    }
+    document.getElementById('cameraModal').classList.remove('active');
+    document.body.style.overflow = '';
 }
 
 // Drag and drop
@@ -413,7 +709,6 @@ if (uploadZone) {
         e.preventDefault();
         uploadZone.classList.remove('dragover');
         if (e.dataTransfer.files.length) {
-            document.getElementById('imageUpload').files = e.dataTransfer.files;
             handleImageUpload({ target: { files: e.dataTransfer.files } });
         }
     });
@@ -434,7 +729,7 @@ function submitReport() {
         category:    document.getElementById('itemCategory').value,
         location:    selectedLocation,
         item_date:   document.getElementById('itemDate').value,
-        image_url:   document.getElementById('previewImg').src || ''
+        images:      selectedImages
     };
 
     // Always get a fresh token before submitting
@@ -476,8 +771,8 @@ function resetForm() {
     document.getElementById('itemDescription').value = '';
     document.getElementById('reporterName').value  = currentUser ? (currentUser.displayName || '') : '';
     document.getElementById('reporterEmail').value = currentUser ? (currentUser.email || '') : '';
-    document.getElementById('previewImg').src = '';
-    document.getElementById('uploadPreview').style.display = 'none';
+    selectedImages = [];
+    renderImagePreviews();
     document.querySelectorAll('.type-option').forEach(function(o) { o.classList.remove('selected'); });
     document.querySelectorAll('.location-option').forEach(function(o) { o.classList.remove('selected'); });
 
@@ -501,14 +796,40 @@ function closeModal() {
 }
 
 // =================== ITEM DETAIL MODAL ===================
+var galleryImages = [];
+var galleryIndex = 0;
+
 function openItemDetail(itemId) {
     var item = ITEMS_DATA.find(function(i) { return i.id === itemId; });
     if (!item) return;
 
+    // Set single image first (fast), then fetch all images
     var img = document.getElementById('detailImg');
-    img.src = item.image;
+    img.src = item.image || '';
     img.alt = item.title;
     img.style.display = item.image ? 'block' : 'none';
+
+    // Hide gallery controls initially
+    document.getElementById('galleryPrev').style.display = 'none';
+    document.getElementById('galleryNext').style.display = 'none';
+    document.getElementById('galleryDots').innerHTML = '';
+    galleryImages = item.image ? [item.image] : [];
+    galleryIndex = 0;
+
+    // Fetch all images asynchronously
+    fetch(API_BASE + '/items/' + itemId + '/images')
+        .then(function(res) { return res.json(); })
+        .then(function(imgs) {
+            if (imgs.length > 1) {
+                galleryImages = imgs.map(function(i) { return i.image_data; });
+                galleryIndex = 0;
+                updateGallery();
+            } else if (imgs.length === 1) {
+                galleryImages = [imgs[0].image_data];
+                img.src = imgs[0].image_data;
+            }
+        })
+        .catch(function() { /* keep single image */ });
 
     var typeEl = document.getElementById('detailType');
     typeEl.className = 'item-card-type ' + item.type;
@@ -525,13 +846,50 @@ function openItemDetail(itemId) {
     emailEl.textContent = item.email;
     emailEl.href = 'mailto:' + item.email;
 
-    document.getElementById('detailReuniteBtn').onclick = function() {
-        closeItemDetail();
-        openReuniteModal(item.id);
-    };
+    var reuniteBtn = document.getElementById('detailReuniteBtn');
+    if (currentUser && currentUser.email === item.email) {
+        reuniteBtn.style.display = '';
+        reuniteBtn.onclick = function() {
+            closeItemDetail();
+            openReuniteModal(item.id);
+        };
+    } else {
+        reuniteBtn.style.display = 'none';
+    }
 
     document.getElementById('itemDetailModal').classList.add('active');
     document.body.style.overflow = 'hidden';
+}
+
+function updateGallery() {
+    var img = document.getElementById('detailImg');
+    img.src = galleryImages[galleryIndex];
+    img.style.display = 'block';
+
+    var showNav = galleryImages.length > 1;
+    document.getElementById('galleryPrev').style.display = showNav ? '' : 'none';
+    document.getElementById('galleryNext').style.display = showNav ? '' : 'none';
+
+    // Render dots
+    if (showNav) {
+        var dotsHtml = '';
+        for (var d = 0; d < galleryImages.length; d++) {
+            dotsHtml += '<span class="gallery-dot' + (d === galleryIndex ? ' active' : '') + '" onclick="galleryGoTo(' + d + ')"></span>';
+        }
+        document.getElementById('galleryDots').innerHTML = dotsHtml;
+    } else {
+        document.getElementById('galleryDots').innerHTML = '';
+    }
+}
+
+function galleryNav(dir) {
+    galleryIndex = (galleryIndex + dir + galleryImages.length) % galleryImages.length;
+    updateGallery();
+}
+
+function galleryGoTo(idx) {
+    galleryIndex = idx;
+    updateGallery();
 }
 
 function closeItemDetail() {
@@ -552,7 +910,11 @@ function confirmReunite() {
             headers: headers
         })
         .then(function(res) {
-            if (!res.ok) throw new Error('Server error: ' + res.status);
+            if (!res.ok) {
+                return res.json().then(function(data) {
+                    throw new Error(data.error || 'Server error: ' + res.status);
+                });
+            }
             return res.json();
         })
         .then(function() {
@@ -562,7 +924,7 @@ function confirmReunite() {
         })
         .catch(function(err) {
             console.error('Failed to reunite:', err);
-            showToast('Failed to reunite. Please try again.', 'info');
+            showToast(err.message || 'Failed to reunite. Please try again.', 'info');
         });
     };
 

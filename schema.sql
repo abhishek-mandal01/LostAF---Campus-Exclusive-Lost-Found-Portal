@@ -53,3 +53,17 @@ CREATE TABLE matches (
 -- ALTER TABLE users ADD COLUMN IF NOT EXISTS firebase_uid TEXT UNIQUE;
 -- ALTER TABLE users ADD COLUMN IF NOT EXISTS profile_picture TEXT;
 -- ALTER TABLE users ALTER COLUMN password_hash SET DEFAULT 'not-set';
+
+-- STEP 3: Multiple images per item
+CREATE TABLE IF NOT EXISTS item_images (
+    id            SERIAL PRIMARY KEY,
+    item_id       INT NOT NULL REFERENCES items(id) ON DELETE CASCADE,
+    image_data    TEXT NOT NULL,
+    display_order INT DEFAULT 0,
+    created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_item_images_item ON item_images(item_id);
+
+-- MIGRATION for Step 3:
+-- CREATE TABLE IF NOT EXISTS item_images (...);  -- run the block above
